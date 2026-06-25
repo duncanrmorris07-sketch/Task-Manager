@@ -5,8 +5,8 @@ import { Task } from '../shared/types';
 
 // Demo/Test credentials - replace with your own from Google Cloud Console
 const DEMO_CREDENTIALS = {
-  clientId: 'YOUR_CLIENT_ID.apps.googleusercontent.com',
-  clientSecret: 'YOUR_CLIENT_SECRET',
+  clientId: '1006272285652-es9scneu456mrkj7fn6r4co507kebt5a.apps.googleusercontent.com',
+  clientSecret: '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',
   redirectUrl: 'http://localhost:3000/auth/callback'
 };
 
