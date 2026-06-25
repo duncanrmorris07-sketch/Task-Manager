@@ -16,6 +16,8 @@ export const CalendarSync: React.FC<CalendarSyncProps> = ({ onAuthSuccess, isIni
   const [showAuthLink, setShowAuthLink] = useState(!isInitialized);
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showCodeInput, setShowCodeInput] = useState(false);
+  const [authCode, setAuthCode] = useState('');
 
   useEffect(() => {
     if (isInitialized) {
@@ -63,23 +65,27 @@ export const CalendarSync: React.FC<CalendarSyncProps> = ({ onAuthSuccess, isIni
   };
 
   const handleManualAuth = async () => {
-    const code = prompt('Enter the authorization code from Google:');
-    if (code) {
-      try {
-        setLoading(true);
-        const result = await window.api.handleAuthCode(code);
-        if (result.success) {
-          setShowAuthLink(false);
-          onAuthSuccess();
-          fetchUpcomingEvents();
-        } else {
-          alert(`Authorization failed: ${result.error}`);
-        }
-      } catch (error) {
-        alert(`Error during authorization: ${error}`);
-      } finally {
-        setLoading(false);
+    if (!authCode.trim()) {
+      alert('Please enter the authorization code');
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      const result = await window.api.handleAuthCode(authCode);
+      if (result.success) {
+        setShowAuthLink(false);
+        setShowCodeInput(false);
+        setAuthCode('');
+        onAuthSuccess();
+        fetchUpcomingEvents();
+      } else {
+        alert(`Authorization failed: ${result.error}`);
       }
+    } catch (error) {
+      alert(`Error during authorization: ${error}`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -99,13 +105,46 @@ export const CalendarSync: React.FC<CalendarSyncProps> = ({ onAuthSuccess, isIni
               {loading ? 'Loading...' : 'Authorize with Google'}
             </button>
             <button
-              onClick={handleManualAuth}
+              onClick={() => setShowCodeInput(!showCodeInput)}
               disabled={loading}
               className="btn btn-secondary"
             >
-              Enter Authorization Code
+              {showCodeInput ? 'Hide Code Input' : 'Enter Authorization Code'}
             </button>
           </div>
+
+          {showCodeInput && (
+            <div className="code-input-section">
+              <label htmlFor="auth-code">Authorization Code:</label>
+              <input
+                id="auth-code"
+                type="text"
+                value={authCode}
+                onChange={(e) => setAuthCode(e.target.value)}
+                placeholder="Paste the authorization code from Google"
+                className="form-input"
+              />
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
+                <button
+                  onClick={handleManualAuth}
+                  disabled={loading || !authCode.trim()}
+                  className="btn btn-primary"
+                >
+                  {loading ? 'Authorizing...' : 'Submit Code'}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowCodeInput(false);
+                    setAuthCode('');
+                  }}
+                  className="btn btn-secondary"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
           {authUrl && (
             <p className="help-text">
               Or copy this URL manually: <br />
