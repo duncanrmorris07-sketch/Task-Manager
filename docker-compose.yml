@@ -1,0 +1,15 @@
+version: '3.8'
+services:
+  app:
+    build: .
+    image: hausmeister-task-manager:latest
+    volumes:
+      - ./hausmeister-tasks.db:/root/hausmeister-tasks.db
+      - ./build:/app/build
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - GOOGLE_CLIENT_ID
+      - GOOGLE_CLIENT_SECRET
+    restart: unless-stopped
