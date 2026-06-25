@@ -46,14 +46,16 @@ export const TaskList: React.FC<TaskListProps> = ({ onTasksChange }) => {
 
   const handleAddTask = async (task: Omit<Task, 'id'>) => {
     try {
+      console.log('Adding task:', task);
       const newTask = await window.api.addTask(task);
+      console.log('Task added successfully:', newTask);
       setTasks([newTask, ...tasks]);
       setTimeLogs({ ...timeLogs, [newTask.id]: [] });
       setShowForm(false);
       onTasksChange();
     } catch (error) {
       console.error('Error adding task:', error);
-      alert('Failed to add task');
+      alert(`Failed to add task: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
 

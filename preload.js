@@ -20,3 +20,4 @@ contextBridge.exposeInMainWorld('api', {
   getCalendarEvents: (timeMin, timeMax) =>
     ipcRenderer.invoke('get-calendar-events', timeMin, timeMax),
 });
+
