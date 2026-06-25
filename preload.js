@@ -1,6 +1,9 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('api', {
+  // Test connection
+  ping: () => ipcRenderer.invoke('ping'),
+
   // Task operations
   addTask: (task) => ipcRenderer.invoke('add-task', task),
   getTasks: () => ipcRenderer.invoke('get-tasks'),
@@ -19,5 +22,6 @@ contextBridge.exposeInMainWorld('api', {
   initializeCalendar: () => ipcRenderer.invoke('initialize-calendar'),
   getCalendarEvents: (timeMin, timeMax) =>
     ipcRenderer.invoke('get-calendar-events', timeMin, timeMax),
+  createCalendarEvent: (task) => ipcRenderer.invoke('create-calendar-event', task),
 });
 

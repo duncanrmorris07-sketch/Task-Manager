@@ -22,12 +22,29 @@ export const TaskList: React.FC<TaskListProps> = ({ onTasksChange }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    testConnection();
     loadTasks();
   }, []);
+
+  const testConnection = async () => {
+    try {
+      if (window.api && window.api.ping) {
+        const result = await window.api.ping();
+        console.log('IPC connection test:', result);
+      } else {
+        console.warn('window.api is not available - running in browser mode');
+      }
+    } catch (error) {
+      console.error('IPC connection test failed:', error);
+    }
+  };
 
   const loadTasks = async () => {
     try {
       setLoading(true);
+      if (!window.api) {
+        throw new Error('API not available - not running in Electron');
+      }
       const loadedTasks = await window.api.getTasks();
       setTasks(loadedTasks);
 

@@ -11,7 +11,7 @@
     "build": "react-scripts build",
     "dev": "concurrently \"npm run react-dev\" \"npm run electron-dev\"",
     "react-dev": "BROWSER=none react-scripts start",
-    "electron-dev": "sleep 3 && electron . --enable-logging",
+    "electron-dev": "sleep 8 && electron . --enable-logging",
     "eject": "react-scripts eject"
   },
   "dependencies": {
@@ -20,7 +20,8 @@
     "sqlite3": "^5.1.6",
     "google-auth-library": "^8.8.0",
     "googleapis": "^118.0.0",
-    "electron-is-dev": "^2.0.0"
+    "electron-is-dev": "^2.0.0",
+    "dotenv": "^16.0.3"
   },
   "devDependencies": {
     "@types/react": "^18.2.0",

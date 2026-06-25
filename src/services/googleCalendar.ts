@@ -1,77 +1,78 @@
-import { google } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
-import { database } from './database';
-import { Task } from '../shared/types';
+import { google } from 'googleapis';
 
-// Demo/Test credentials - replace with your own from Google Cloud Console
-const DEMO_CREDENTIALS = {
-  clientId: '1006272285652-es9scneu456mrkj7fn6r4co507kebt5a.apps.googleusercontent.com',
-  clientSecret: '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',
-  redirectUrl: 'http://localhost:3000/auth/callback'
-};
+// Google OAuth Configuration
+const CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || 'YOUR_CLIENT_ID';
+const CLIENT_SECRET = process.env.REACT_APP_GOOGLE_CLIENT_SECRET || 'YOUR_CLIENT_SECRET';
+const REDIRECT_URI = 'urn:ietf:wg:oauth:2.0:oob'; // For desktop app
 
-class GoogleCalendarService {
+export interface CalendarEvent {
+  id: string;
+  summary: string;
+  description: string;
+  start: { dateTime: string };
+  end: { dateTime: string };
+  status: string;
+}
+
+export class GoogleCalendarService {
   private oauth2Client: OAuth2Client;
-  private calendar = null;
+  private calendar: any;
+  private accessToken: string | null = null;
+  private refreshToken: string | null = null;
 
   constructor() {
-    this.oauth2Client = new OAuth2Client(
-      DEMO_CREDENTIALS.clientId,
-      DEMO_CREDENTIALS.clientSecret,
-      DEMO_CREDENTIALS.redirectUrl
-    );
+    this.oauth2Client = new OAuth2Client(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
+    this.calendar = google.calendar({ version: 'v3', auth: this.oauth2Client });
   }
 
   /**
-   * Get authorization URL for user to login
+   * Get the OAuth authorization URL
    */
   getAuthUrl(): string {
-    return this.oauth2Client.generateAuthUrl({
-      access_type: 'offline',
-      scope: ['https://www.googleapis.com/auth/calendar'],
-    });
+    try {
+      const authUrl = this.oauth2Client.generateAuthUrl({
+        access_type: 'offline',
+        scope: ['https://www.googleapis.com/auth/calendar'],
+      });
+      return authUrl;
+    } catch (error) {
+      console.error('Error generating auth URL:', error);
+      return '';
+    }
   }
 
   /**
-   * Exchange authorization code for tokens
+   * Handle the authorization code from Google OAuth
    */
-  async handleAuthCode(code: string): Promise<void> {
+  async handleAuthCode(code: string): Promise<{ accessToken: string; refreshToken: string }> {
     try {
       const { tokens } = await this.oauth2Client.getToken(code);
       this.oauth2Client.setCredentials(tokens);
+      this.accessToken = tokens.access_token || null;
+      this.refreshToken = tokens.refresh_token || null;
 
-      // Save tokens to database
-      await database.saveCalendarSettings({
-        accessToken: tokens.access_token || '',
-        refreshToken: tokens.refresh_token || '',
-        expiresAt: tokens.expiry_date || 0,
-        calendarId: 'primary'
-      });
-
-      this.calendar = google.calendar({ version: 'v3', auth: this.oauth2Client });
+      return {
+        accessToken: this.accessToken || '',
+        refreshToken: this.refreshToken || '',
+      };
     } catch (error) {
-      console.error('Error exchanging auth code:', error);
+      console.error('Error handling auth code:', error);
       throw error;
     }
   }
 
   /**
-   * Initialize calendar service with stored credentials
+   * Initialize calendar service with stored tokens
    */
-  async initializeFromStorage(): Promise<boolean> {
+  async initializeFromStorage(accessToken: string, refreshToken: string): Promise<boolean> {
     try {
-      const settings = await database.getCalendarSettings();
-      if (!settings || !settings.accessToken) {
-        return false;
-      }
-
       this.oauth2Client.setCredentials({
-        access_token: settings.accessToken,
-        refresh_token: settings.refreshToken,
-        expiry_date: settings.expiresAt,
+        access_token: accessToken,
+        refresh_token: refreshToken,
       });
-
-      this.calendar = google.calendar({ version: 'v3', auth: this.oauth2Client });
+      this.accessToken = accessToken;
+      this.refreshToken = refreshToken;
       return true;
     } catch (error) {
       console.error('Error initializing from storage:', error);
@@ -80,11 +81,11 @@ class GoogleCalendarService {
   }
 
   /**
-   * Create a calendar event for a task
+   * Create a calendar event from a task
    */
-  async createTaskEvent(task: Task): Promise<string | null> {
-    if (!this.calendar) {
-      console.log('Calendar not initialized');
+  async createTaskEvent(task: any): Promise<string | null> {
+    if (!this.accessToken) {
+      console.error('Not authenticated with Google Calendar');
       return null;
     }
 
@@ -92,22 +93,14 @@ class GoogleCalendarService {
       const event = {
         summary: task.title,
         description: task.description || '',
-        start: {
-          dateTime: new Date(task.createdAt).toISOString(),
-        },
-        end: {
-          dateTime: new Date(new Date(task.createdAt).getTime() + 60 * 60 * 1000).toISOString(),
-        },
-        extendedProperties: {
-          private: {
-            taskId: task.id.toString(),
-          },
-        },
+        start: { dateTime: new Date(task.createdAt).toISOString() },
+        end: { dateTime: new Date(Date.now() + 3600000).toISOString() }, // 1 hour duration
+        status: 'confirmed',
       };
 
       const response = await this.calendar.events.insert({
         calendarId: 'primary',
-        requestBody: event,
+        resource: event,
       });
 
       return response.data.id || null;
@@ -118,31 +111,27 @@ class GoogleCalendarService {
   }
 
   /**
-   * Update a calendar event for a task
+   * Update a calendar event with task status
    */
-  async updateTaskEvent(task: Task): Promise<boolean> {
-    if (!this.calendar || !task.googleCalendarEventId) {
+  async updateTaskEvent(eventId: string, task: any): Promise<boolean> {
+    if (!this.accessToken) {
+      console.error('Not authenticated with Google Calendar');
       return false;
     }
 
     try {
       const event = {
         summary: task.title,
-        description: task.description || '',
-        start: {
-          dateTime: new Date(task.createdAt).toISOString(),
-        },
-        end: {
-          dateTime: task.completedAt
-            ? new Date(task.completedAt).toISOString()
-            : new Date(new Date(task.createdAt).getTime() + (task.timeSpentMinutes || 60) * 60 * 1000).toISOString(),
-        },
+        description: `${task.description || ''}\n\nStatus: ${task.status}`,
+        start: { dateTime: new Date(task.createdAt).toISOString() },
+        end: { dateTime: new Date(Date.now() + 3600000).toISOString() },
+        status: task.status === 'completed' ? 'completed' : 'confirmed',
       };
 
       await this.calendar.events.update({
         calendarId: 'primary',
-        eventId: task.googleCalendarEventId,
-        requestBody: event,
+        eventId,
+        resource: event,
       });
 
       return true;
@@ -153,10 +142,11 @@ class GoogleCalendarService {
   }
 
   /**
-   * Delete a calendar event for a task
+   * Delete a calendar event
    */
   async deleteTaskEvent(eventId: string): Promise<boolean> {
-    if (!this.calendar) {
+    if (!this.accessToken) {
+      console.error('Not authenticated with Google Calendar');
       return false;
     }
 
@@ -173,56 +163,30 @@ class GoogleCalendarService {
   }
 
   /**
-   * Sync task status to calendar (mark as complete/incomplete)
+   * Get upcoming calendar events
    */
-  async syncTaskStatus(task: Task): Promise<void> {
-    if (!task.googleCalendarEventId) {
-      return;
-    }
-
-    try {
-      let colorId = '1'; // blue - default
-      if (task.status === 'completed') {
-        colorId = '2'; // green
-      } else if (task.status === 'in-progress') {
-        colorId = '4'; // red
-      }
-
-      await this.calendar.events.update({
-        calendarId: 'primary',
-        eventId: task.googleCalendarEventId,
-        requestBody: {
-          colorId,
-        },
-      });
-    } catch (error) {
-      console.error('Error syncing task status:', error);
-    }
-  }
-
-  /**
-   * Get list of upcoming tasks from calendar
-   */
-  async getUpcomingEvents(timeMin: string, timeMax: string): Promise<any[]> {
-    if (!this.calendar) {
+  async getUpcomingEvents(): Promise<CalendarEvent[]> {
+    if (!this.accessToken) {
+      console.error('Not authenticated with Google Calendar');
       return [];
     }
 
     try {
       const response = await this.calendar.events.list({
         calendarId: 'primary',
-        timeMin,
-        timeMax,
+        timeMin: new Date().toISOString(),
+        maxResults: 10,
         singleEvents: true,
         orderBy: 'startTime',
       });
 
       return response.data.items || [];
     } catch (error) {
-      console.error('Error fetching calendar events:', error);
+      console.error('Error getting calendar events:', error);
       return [];
     }
   }
 }
 
 export const googleCalendarService = new GoogleCalendarService();
+
