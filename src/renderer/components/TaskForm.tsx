@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
 import { Task } from '../shared/types';
 
+export type TaskFormData = Omit<Task, 'id'> & {
+  syncToCalendar?: boolean;
+};
+
 interface TaskFormProps {
-  onSubmit: (task: Omit<Task, 'id'>) => void;
+  onSubmit: (task: TaskFormData) => void;
   onCancel: () => void;
   initialTask?: Task;
 }
@@ -14,6 +18,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onSubmit, onCancel, initialT
   const [status, setStatus] = useState<'pending' | 'in-progress' | 'completed'>(
     initialTask?.status || 'pending'
   );
+  const [syncToCalendar, setSyncToCalendar] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,6 +37,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onSubmit, onCancel, initialT
       completedAt: initialTask?.completedAt || null,
       timeSpentMinutes: initialTask?.timeSpentMinutes || 0,
       googleCalendarEventId: initialTask?.googleCalendarEventId,
+      syncToCalendar,
     });
 
     // Reset form
@@ -39,6 +45,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onSubmit, onCancel, initialT
     setDescription('');
     setPriority('medium');
     setStatus('pending');
+    setSyncToCalendar(false);
   };
 
   return (
@@ -103,6 +110,17 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onSubmit, onCancel, initialT
             <option value="completed">Completed</option>
           </select>
         </div>
+      </div>
+
+      <div className="form-group checkbox-group">
+        <label className="checkbox-label">
+          <input
+            type="checkbox"
+            checked={syncToCalendar}
+            onChange={(e) => setSyncToCalendar(e.target.checked)}
+          />
+          Add this task to Google Calendar
+        </label>
       </div>
 
       <div className="form-actions">

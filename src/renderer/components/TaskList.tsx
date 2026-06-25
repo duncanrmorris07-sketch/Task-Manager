@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Task, TimeLog } from '../shared/types';
 import { TaskItem } from './TaskItem';
-import { TaskForm } from './TaskForm';
+import { TaskForm, TaskFormData } from './TaskForm';
 
 interface TaskListProps {
   onTasksChange: () => void;
@@ -61,11 +61,25 @@ export const TaskList: React.FC<TaskListProps> = ({ onTasksChange }) => {
     }
   };
 
-  const handleAddTask = async (task: Omit<Task, 'id'>) => {
+  const handleAddTask = async (task: TaskFormData) => {
     try {
       console.log('Adding task:', task);
       const newTask = await window.api.addTask(task);
       console.log('Task added successfully:', newTask);
+
+      if (task.syncToCalendar && window.api.createCalendarEvent) {
+        try {
+          const eventId = await window.api.createCalendarEvent(newTask);
+          if (eventId) {
+            await window.api.updateTask(newTask.id, { googleCalendarEventId: eventId });
+            newTask.googleCalendarEventId = eventId;
+          }
+        } catch (calendarError) {
+          console.warn('Failed to create calendar event:', calendarError);
+          alert('Task created locally but calendar sync failed. Please reconnect Google Calendar and try again.');
+        }
+      }
+
       setTasks([newTask, ...tasks]);
       setTimeLogs({ ...timeLogs, [newTask.id]: [] });
       setShowForm(false);

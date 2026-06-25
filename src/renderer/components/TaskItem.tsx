@@ -76,6 +76,9 @@ export const TaskItem: React.FC<TaskItemProps> = ({
           <span className={`status-badge ${getStatusColor(task.status)}`}>
             {task.status.replace('-', ' ').toUpperCase()}
           </span>
+          {task.googleCalendarEventId && (
+            <span className="calendar-badge">Calendar Synced</span>
+          )}
         </div>
         <div className="task-actions">
           <button onClick={onEdit} className="btn btn-sm btn-primary" title="Edit">
